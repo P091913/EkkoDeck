@@ -2,9 +2,9 @@ import '@fontsource-variable/inter';
 import { createContext, h, render } from 'preact';
 import { useContext, useEffect, useRef, useState } from 'preact/hooks';
 import {
-  Activity, Brain, Clipboard, Gamepad2, HeadphoneOff, Joystick, LayoutGrid, Lock, MessageCircle, Mic, MicOff,
-  Minimize2, Monitor, Music as MusicNote, Pause, Play, Power, PowerOff, ScreenShare, Scissors, Search, Send,
-  Settings, SkipBack, SkipForward, Smile, Square, Tv as TvSet, Volume1, Volume2, VolumeX, type IconNode,
+  Activity, Brain, Clipboard, Gamepad2, HeadphoneOff, Joystick, LayoutGrid, Lock, MicOff, Minimize2, Monitor,
+  Pause, Play, Power, PowerOff, ScreenShare, Scissors, Search, Send, Settings, SkipBack, SkipForward, Smile,
+  Square, Volume1, Volume2, VolumeX, type IconNode,
 } from 'lucide';
 
 type Reply = { ok: boolean; data: any };
@@ -257,14 +257,6 @@ function Chat() {
   );
 }
 
-const PAGES = [
-  { name: 'Voice', icon: Mic },
-  { name: 'System', icon: Monitor },
-  { name: 'Music', icon: MusicNote },
-  { name: 'TV', icon: TvSet },
-  { name: 'Chat', icon: MessageCircle },
-];
-
 function App() {
   const track = useRef<HTMLDivElement>(null);
   const [page, setPage] = useState(0);
@@ -278,7 +270,7 @@ function App() {
 
   const go = (i: number) => {
     const t = track.current;
-    if (t) t.scrollTo({ left: Math.max(0, Math.min(PAGES.length - 1, i)) * t.clientWidth, behavior: 'smooth' });
+    if (t) t.scrollTo({ left: Math.max(0, Math.min(t.children.length - 1, i)) * t.clientWidth, behavior: 'smooth' });
   };
 
   // Our own swipe, for when the browser won't pan by itself (touch reported as a mouse, or a mouse over RustDesk).
@@ -358,17 +350,6 @@ function App() {
       <div class={`toast ${toast[1]}`} role="status" hidden={!toast[0]}>
         {toast[0]}
       </div>
-
-      <nav>
-        {PAGES.map((p, i) => (
-          <button key={p.name} class={i === page ? 'on' : ''} aria-current={i === page ? 'page' : undefined} onClick={() => go(i)}>
-            <span class="ico">
-              <Icon node={p.icon} size={22} />
-            </span>
-            {p.name}
-          </button>
-        ))}
-      </nav>
     </Notify.Provider>
   );
 }

@@ -101,8 +101,12 @@ h2 small {
 /* Tiles */
 .groups {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 380px), 1fr));
-  gap: 0 28px;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr));
+  gap: 0 24px;
+}
+/* three columns per group (the widest group is volume) so two groups fit side by side on an 800px-wide screen */
+.groups .grid {
+  grid-template-columns: repeat(3, 1fr);
 }
 h1 + .grid {
   margin-top: 18px;
@@ -367,7 +371,7 @@ h1 + .grid {
 .toast {
   position: fixed;
   left: 50%;
-  bottom: 96px;
+  bottom: 20px;
   max-width: min(92vw, 640px);
   padding: 12px 18px;
   font-weight: 500;
@@ -402,41 +406,4 @@ h1 + .grid {
     opacity: 0;
     transform: translate(-50%, 8px);
   }
-}
-
-/* Bottom tabs */
-nav {
-  display: flex;
-  justify-content: space-around;
-  padding: 8px 8px 10px;
-  background: rgba(11, 13, 18, 0.92);
-  border-top: 1px solid var(--line);
-}
-nav button {
-  flex: 1;
-  max-width: 140px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  padding: 4px 0;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--muted);
-  background: none;
-}
-nav .ico {
-  display: grid;
-  place-items: center;
-  width: 60px;
-  height: 32px;
-  border-radius: 16px;
-  transition: background 0.2s;
-}
-nav .on {
-  color: var(--text);
-}
-nav .on .ico {
-  color: #c9cfff;
-  background: rgba(109, 124, 255, 0.22);
 }
