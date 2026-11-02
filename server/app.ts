@@ -4,6 +4,7 @@ import { pcAgent } from './pcAgent.ts';
 import { tvremote } from './tvremote.ts';
 import { ekko } from './ekko.ts';
 import { macros } from './macros.ts';
+import { status } from './status.ts';
 
 export const app = new Hono()
   // Loopback alone doesn't stop another page open in a browser on the Pi from calling us (CSRF, DNS rebinding):
@@ -19,4 +20,5 @@ export const app = new Hono()
   .route('/api/tv', tvremote)
   .route('/api/ekko', ekko)
   .route('/api/macros', macros)
+  .route('/api/status', status)
   .use('/*', serveStatic({ root: './web/dist' }));

@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { call, send } from './upstream.ts';
 
-const pc = { name: 'PC agent', base: process.env.PC_AGENT_URL, key: process.env.PC_AGENT_KEY };
+export const pc = { name: 'PC agent', base: process.env.PC_AGENT_URL, key: process.env.PC_AGENT_KEY };
 
 // Only these ids get the key attached; anything else the page sends is refused here.
 const ACTIONS = new Set([

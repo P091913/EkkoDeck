@@ -115,26 +115,31 @@ const TV_POWER = [btn('TV on', '/api/tv/launch', Power), btn('TV off', '/api/tv/
 
 const clock = (s?: number) => (s == null ? '' : `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`);
 
-function Music({ active }: { active: boolean }) {
-  const [np, setNp] = useState<Reply | null>(null);
+// Polls only while its page is on screen.
+function usePoll(path: string, ms: number, active: boolean) {
+  const [reply, setReply] = useState<Reply | null>(null);
   useEffect(() => {
     if (!active) return;
     let stopped = false;
     let timer: number | undefined;
-    // Chain timeouts instead of setInterval so a slow agent never piles up requests.
+    // Chain timeouts instead of setInterval so a slow service never piles up requests.
     const tick = async () => {
-      const r = await api('/api/pc/nowplaying', undefined, 'GET');
+      const r = await api(path, undefined, 'GET');
       if (stopped) return;
-      setNp(r);
-      timer = setTimeout(tick, 2000);
+      setReply(r);
+      timer = setTimeout(tick, ms);
     };
     tick();
     return () => {
       stopped = true;
       clearTimeout(timer);
     };
-  }, [active]);
+  }, [path, ms, active]);
+  return reply;
+}
 
+function Music({ active }: { active: boolean }) {
+  const np = usePoll('/api/pc/nowplaying', 2000, active);
   const d = np?.data ?? {};
   const live = !!np?.ok && d.active;
   const pct = live && d.durationSeconds ? Math.min(100, (100 * d.positionSeconds) / d.durationSeconds) : 0;
@@ -257,6 +262,83 @@ function Chat() {
   );
 }
 
+type Entry = { id: number; at: number; service: string; what: string; ms?: number; code?: number; reply?: object };
+type Service = { name: string; up: boolean; ms?: number; error?: string };
+
+// The server names a call by its last path segment ("lock_pc", "pause"); show the matching button's label instead.
+const LABEL: Record<string, string> = Object.fromEntries(
+  [...DISCORD, ...VOLUME, ...APPS, ...SYSTEM, PREV, PLAY_PAUSE, NEXT, ...TV_PLAYBACK, ...TV_POWER].map((b) => [
+    b.path.split('/').pop(),
+    b.label,
+  ]),
+);
+
+const ago = (ms: number) =>
+  ms < 60_000 ? `${Math.floor(ms / 1000)}s ago` : ms < 3_600_000 ? `${Math.floor(ms / 60_000)}m ago` : `${Math.floor(ms / 3_600_000)}h ago`;
+const took = (ms = 0) => (ms < 1000 ? `${ms}ms` : `${(ms / 1000).toFixed(1)}s`);
+const upFor = (s: number) =>
+  s >= 86_400 ? `${Math.floor(s / 86_400)}d ${Math.floor((s % 86_400) / 3600)}h` : `${Math.floor(s / 3600)}h ${Math.floor((s % 3600) / 60)}m`;
+
+function Feed({ active }: { active: boolean }) {
+  const status = usePoll('/api/status', 2000, active);
+  const health = usePoll('/api/status/health', 10_000, active);
+  const feed: Entry[] = status?.data.feed ?? [];
+  const services: Service[] = health?.data.services ?? [];
+  const pi = status?.data.pi;
+  const now = Date.now(); // same clock as the server: both run on the Pi
+
+  return (
+    <>
+      <div class="head">
+        <h1>Activity</h1>
+        {pi && (
+          <span class="pi">
+            {pi.tempC != null && (
+              <span class={pi.tempC >= 80 ? 'err' : pi.tempC >= 70 ? 'warn' : ''}>{Math.round(pi.tempC)}°C · </span>
+            )}
+            load {pi.load.toFixed(2)} · RAM {pi.memPct}% · up {upFor(pi.uptimeS)}
+          </span>
+        )}
+      </div>
+      <div class="chips">
+        {!health && <span class="chip">Checking services…</span>}
+        {services.map((s) => (
+          <span key={s.name} class={`chip ${s.up ? 'ok' : 'err'}`}>
+            <i class="dot" />
+            {s.name}
+            <small>{s.up ? `${s.ms}ms` : s.error}</small>
+          </span>
+        ))}
+      </div>
+      <h2>Calls</h2>
+      {status && !status.ok && <p class="empty">Activity unavailable</p>}
+      {status?.ok && feed.length === 0 && <p class="empty">Nothing yet. Press a button and it shows up here.</p>}
+      <ul class="feed">
+        {feed.map((e) => {
+          const running = e.code == null;
+          // Same wording and colour as the toast that button showed.
+          const [msg, kind] = running ? ['', 'run'] : describe({ ok: e.code! >= 200 && e.code! < 300, data: e.reply ?? {} });
+          return (
+            <li key={e.id} class={kind}>
+              <i class="dot" />
+              <span class="svc">{e.service}</span>
+              <span class="what">
+                {LABEL[e.what] ?? e.what}
+                {msg && msg !== 'done' && <small>{msg}</small>}
+              </span>
+              <span class="when">
+                {running ? `running ${clock((now - e.at) / 1000)}` : `${ago(now - e.at)} · ${took(e.ms)}`}
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+    </>
+  );
+}
+
+const PAGES = 6; // one dot per <section> below
+
 function App() {
   const track = useRef<HTMLDivElement>(null);
   const [page, setPage] = useState(0);
@@ -346,6 +428,15 @@ function App() {
           <h1>Chat</h1>
           <Chat />
         </section>
+        <section class="page" aria-label="Activity">
+          <Feed active={page === 5} />
+        </section>
+      </div>
+
+      <div class="dots" aria-hidden="true">
+        {Array.from({ length: PAGES }, (_, i) => (
+          <i key={i} class={i === page ? 'on' : undefined} />
+        ))}
       </div>
 
       <div class={`toast ${toast[1]}`} role="status" hidden={!toast[0]}>
