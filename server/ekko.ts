@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { call, send } from './upstream.ts';
 
-const brain = { name: 'Ekko', base: process.env.EKKO_URL, key: process.env.EKKO_KEY };
+export const brain = { name: 'Ekko', base: process.env.EKKO_URL, key: process.env.EKKO_KEY };
 
 export const ekko = new Hono().post('/message', async (c) => {
   const { text } = await c.req.json().catch(() => ({}));
@@ -9,5 +9,5 @@ export const ekko = new Hono().post('/message', async (c) => {
   // Fixed conversationId so Ekko's follow-up questions ("which one?") are answered by the next message.
   const body = { text, channel: 'deck', conversationId: 'deck' };
   // Long timeout: Ekko may be waiting on tvremote waking the TV.
-  return send(await call(brain, '/message', { method: 'POST', body, timeoutMs: 180_000 }));
+  return send(await call(brain, '/message', { method: 'POST', body, timeoutMs: 180_000, what: 'Message' }));
 });
