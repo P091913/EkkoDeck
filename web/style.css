@@ -27,10 +27,7 @@ body {
   margin: 0;
   overflow: hidden;
   color: var(--text);
-  background:
-    radial-gradient(1100px 600px at 0% -10%, #1a2042 0%, transparent 60%),
-    radial-gradient(900px 500px at 100% 110%, #2a1a42 0%, transparent 55%),
-    var(--bg);
+  background: var(--bg);
   user-select: none;
 }
 #app {
@@ -63,12 +60,21 @@ input:focus-visible {
   scroll-snap-type: x mandatory;
   overscroll-behavior-x: contain;
   scrollbar-width: none;
+  /* Slide the strip as its own GPU layer instead of repainting the whole screen every frame (matters on a Pi);
+     the solid background keeps text crisp on that layer. */
+  will-change: scroll-position;
+  background: var(--bg);
 }
 .page {
   flex: 0 0 100%;
   scroll-snap-align: start;
   scroll-snap-stop: always;
   overflow-y: auto;
+  /* Each page also scrolls vertically; as its own layer, a swipe starting on it no longer waits on the main thread. */
+  will-change: scroll-position;
+  background:
+    radial-gradient(1100px 600px at 0% -10%, #1a2042 0%, transparent 60%),
+    radial-gradient(900px 500px at 100% 110%, #2a1a42 0%, transparent 55%);
   padding: 22px max(16px, calc((100% - 960px) / 2)) 28px;
 }
 .page.fill {
@@ -129,9 +135,8 @@ h1 + .grid {
   background: linear-gradient(180deg, var(--surface-2), var(--surface));
   border: 1px solid var(--line);
   border-radius: 20px;
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.04),
-    0 8px 24px rgba(0, 0, 0, 0.25);
+  /* no blurred drop shadow: costly for the Pi's GPU and barely visible on this background */
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
   transition: transform 0.08s ease;
 }
 .tile svg {
@@ -165,7 +170,6 @@ h1 + .grid {
   background: linear-gradient(180deg, var(--surface-2), var(--surface));
   border: 1px solid var(--line);
   border-radius: 28px;
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.3);
 }
 .np {
   max-width: 640px;
@@ -203,7 +207,9 @@ h1 + .grid {
 .bar > div {
   height: 100%;
   background: linear-gradient(90deg, var(--accent), var(--accent-2));
-  transition: width 2s linear; /* glides between the 2-second polls */
+  transform-origin: left;
+  /* glides between the 2-second polls; transform (not width) so the GPU animates it without relayout */
+  transition: transform 2s linear;
 }
 .times {
   display: flex;
