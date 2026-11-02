@@ -146,7 +146,7 @@ function Music({ active }: { active: boolean }) {
       <div class="np-title">{headline}</div>
       <div class="np-artist">{live ? [d.artist, d.album].filter(Boolean).join(' — ') : ''}</div>
       <div class="bar">
-        <div style={{ width: `${pct}%` }} />
+        <div style={{ transform: `scaleX(${pct / 100})` }} />
       </div>
       <div class="times">
         <span>{live ? clock(d.positionSeconds) : ''}</span>
@@ -300,7 +300,8 @@ function App() {
       <div
         class="track"
         ref={track}
-        onScroll={(e) => setPage(Math.round(e.currentTarget.scrollLeft / e.currentTarget.clientWidth))}
+        // scrollend, not scroll: re-rendering (and starting Music's polling) mid-swipe causes a stutter on the Pi
+        onScrollEnd={(e) => setPage(Math.round(e.currentTarget.scrollLeft / e.currentTarget.clientWidth))}
         onPointerDown={onPointerDown}
         onPointerUp={onPointerUp}
         onPointerCancel={() => (swipe.current.down = false)}
