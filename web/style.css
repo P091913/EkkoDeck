@@ -44,6 +44,9 @@ button {
   cursor: pointer;
   touch-action: manipulation;
 }
+button:disabled {
+  opacity: 0.5;
+}
 button:focus-visible,
 input:focus-visible {
   outline: 2px solid var(--accent);
@@ -370,9 +373,6 @@ h1 + .grid {
   height: 52px;
   border-radius: 50%;
 }
-.send:disabled {
-  opacity: 0.5;
-}
 
 /* Activity */
 .head {
@@ -612,9 +612,6 @@ h1 + .grid {
 .run-card .pill:not(.accent) {
   background: var(--surface);
   border: 1px solid var(--line);
-}
-.run-card .pill:disabled {
-  opacity: 0.5;
 }
 
 /* Toast */
