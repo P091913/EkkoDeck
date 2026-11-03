@@ -1,6 +1,7 @@
 import '@fontsource-variable/inter';
 import { createContext, h, render } from 'preact';
-import { useContext, useEffect, useRef, useState } from 'preact/hooks';
+import { useContext, useEffect, useMemo, useRef, useState } from 'preact/hooks';
+import { createMap, isClaude, modelName, type EkkoMap, type TraceEvent } from './ekko-map';
 import {
   Activity, Brain, Clipboard, Gamepad2, HeadphoneOff, Joystick, LayoutGrid, Lock, MicOff, Minimize2, Monitor,
   Pause, Play, Power, PowerOff, ScreenShare, Scissors, Search, Send, Settings, SkipBack, SkipForward, Smile,
@@ -337,7 +338,165 @@ function Feed({ active }: { active: boolean }) {
   );
 }
 
-const PAGES = 6; // one dot per <section> below
+type Run = { id: string; request: string; question?: string };
+type Turn = { id: string; channel: string; at: Date; said?: string; path: string[]; reply?: string; ms?: number; state: 'run' | 'ok' | 'err' };
+
+const hhmm = (d: Date) => d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+const isToday = (ts: string) => new Date(ts).toDateString() === new Date().toDateString();
+
+// One card per message: what was said, the way it went (fast path or which model, then which tool), and the answer.
+function turnsOf(events: TraceEvent[]): Turn[] {
+  const turns = new Map<string, Turn>();
+  for (const e of events) {
+    let t = turns.get(e.requestId);
+    if (!t) turns.set(e.requestId, (t = { id: e.requestId, channel: e.channel, at: new Date(e.ts), path: [], state: 'run' }));
+    const add = (s: string) => t.path.at(-1) !== s && t.path.push(s);
+    if (e.step === 'request') t.said = e.text ?? undefined;
+    else if (e.step === 'fast_path' && e.hit) add('fast path');
+    else if (e.step.startsWith('llm:') && e.model) add(modelName(e.model));
+    else if ((e.step === 'tool' || e.step === 'agent_tool') && e.tool) {
+      add(e.tool.replace(/_/g, ' ') + (e.ok === false ? ' ✗' : ''));
+      if (e.ok === false) t.state = 'err';
+    } else if (e.step === 'error') {
+      add('error');
+      t.state = 'err';
+    } else if (e.step === 'reply') {
+      t.reply = e.text ?? undefined;
+      t.ms = e.latencyMs ?? undefined;
+      if (t.state === 'run') t.state = 'ok';
+    }
+  }
+  // A turn with no reply after five minutes never got one (Ekko restarted mid-turn).
+  for (const t of turns.values()) if (t.state === 'run' && Date.now() - t.at.getTime() > 300_000) t.state = 'err';
+  return [...turns.values()].reverse();
+}
+
+function RunCard({ run }: { run: Run }) {
+  const notify = useContext(Notify);
+  const [busy, setBusy] = useState(false);
+  async function decide(verdict: 'approve' | 'deny') {
+    setBusy(true);
+    notify([verdict === 'approve' ? 'Approving…' : 'Denying…', '']);
+    const r = await api(`/api/ekko/runs/${run.id}/${verdict}`);
+    notify(r.ok ? [r.data.text ?? 'done', 'ok'] : describe(r));
+    setBusy(false);
+  }
+  return (
+    <div class="run-card">
+      <div>
+        <b>Claude is waiting on you</b>
+        <span>{run.question ?? run.request}</span>
+      </div>
+      <button class="pill accent" disabled={busy} onClick={() => decide('approve')}>
+        Approve
+      </button>
+      <button class="pill" disabled={busy} onClick={() => decide('deny')}>
+        Deny
+      </button>
+    </div>
+  );
+}
+
+function Ekko({ active }: { active: boolean }) {
+  const box = useRef<HTMLDivElement>(null);
+  const map = useRef<EkkoMap | null>(null);
+  const cursor = useRef({ boot: '', seq: 0 });
+  const [events, setEvents] = useState<TraceEvent[]>([]);
+  const [down, setDown] = useState('');
+  const runs = usePoll('/api/ekko/runs', 3000, active);
+  const waiting: Run[] = runs?.ok && Array.isArray(runs.data) ? runs.data : [];
+
+  useEffect(() => {
+    map.current = createMap(box.current!);
+    return () => map.current!.destroy();
+  }, []);
+  useEffect(() => map.current!.setActive(active), [active]);
+
+  useEffect(() => {
+    if (!active) return;
+    let stopped = false;
+    let timer: number | undefined;
+    const tick = async (): Promise<void> => {
+      const c = cursor.current;
+      const r = await api(`/api/ekko/trace?after=${c.seq}`, undefined, 'GET');
+      if (stopped) return;
+      if (!r.ok) setDown(r.data.error ?? 'Ekko unavailable');
+      else if (c.boot && r.data.boot !== c.boot) {
+        // Ekko restarted and its numbers began again: load everything afresh.
+        Object.assign(c, { boot: '', seq: 0 });
+        return tick();
+      } else {
+        setDown('');
+        const list: TraceEvent[] = r.data.events ?? [];
+        const m = map.current!;
+        if (!c.boot) {
+          m.reset();
+          list.forEach((e) => m.add(e)); // counted, not played: these already happened
+          setEvents(list);
+        } else if (list.length) {
+          list.forEach((e, i) => {
+            m.add(e);
+            m.play(e, i * 180); // a batch plays in order rather than all at once
+          });
+          setEvents((old) => [...old, ...list].slice(-1000));
+        }
+        c.boot = r.data.boot;
+        if (list.length) c.seq = list[list.length - 1].seq;
+      }
+      timer = setTimeout(tick, 1000);
+    };
+    tick();
+    return () => {
+      stopped = true;
+      clearTimeout(timer);
+    };
+  }, [active]);
+
+  const turns = useMemo(() => turnsOf(events).slice(0, 40), [events]);
+  const today = events.filter((e) => isToday(e.ts));
+  const messages = today.filter((e) => e.step === 'request').length;
+  const claude = today.filter((e) => e.step.startsWith('llm:') && isClaude(e.model));
+  const claudeTurns = new Set(claude.map((e) => e.requestId)).size;
+  const tokens = claude.reduce((n, e) => n + (e.tokensIn ?? 0) + (e.tokensOut ?? 0), 0);
+
+  return (
+    <>
+      <div class="head">
+        <h1>Ekko</h1>
+        <span class="pi">
+          {down ||
+            `${messages} message${messages === 1 ? '' : 's'} today` +
+              (claudeTurns ? ` · ${claudeTurns} used Claude · ${(tokens / 1000).toFixed(1)}k tokens` : '')}
+        </span>
+      </div>
+      {waiting.map((r) => (
+        <RunCard key={r.id} run={r} />
+      ))}
+      <div class="ekko">
+        <div class="map" ref={box} aria-label="Live map of what Ekko is doing" role="img" />
+        <div class="turns">
+          {turns.length === 0 && <p class="empty">{down ? 'Ekko unavailable' : 'No messages yet.'}</p>}
+          {turns.map((t) => (
+            <div key={t.id} class={`turn ${t.state}`}>
+              <div class="said">
+                <i class="dot" />
+                <b>{t.said ?? '…'}</b>
+                <time>{hhmm(t.at)}</time>
+              </div>
+              <div class="path">
+                {[t.channel, ...t.path].join(' → ')}
+                {t.state === 'run' ? ' · working…' : t.ms != null ? ` · ${took(t.ms)}` : ''}
+              </div>
+              {t.reply && <div class="ans">{t.reply}</div>}
+            </div>
+          ))}
+        </div>
+      </div>
+    </>
+  );
+}
+
+const PAGES = 7; // one dot per <section> below
 
 function App() {
   const track = useRef<HTMLDivElement>(null);
@@ -428,8 +587,11 @@ function App() {
           <h1>Chat</h1>
           <Chat />
         </section>
+        <section class="page fill" aria-label="Ekko">
+          <Ekko active={page === 5} />
+        </section>
         <section class="page" aria-label="Activity">
-          <Feed active={page === 5} />
+          <Feed active={page === 6} />
         </section>
       </div>
 
