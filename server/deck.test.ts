@@ -21,6 +21,14 @@ test('unknown PC action ids are refused, known ones pass through', async () => {
   assert.equal((await action('steam')).status, 503);
 });
 
+test('approving a Claude run only passes a well-formed run id through', async () => {
+  const decide = (path: string) => app.request(`/api/ekko/runs/${path}`, { method: 'POST', headers: deck });
+  assert.equal((await decide('0123456789ab/approve')).status, 503);
+  assert.equal((await decide('0123456789ab/deny')).status, 503);
+  assert.equal((await decide('..%2F..%2Fmessage/approve')).status, 400);
+  assert.equal((await decide('0123456789ab/delete')).status, 404);
+});
+
 test('upstream failures come back as JSON errors, with the key attached', async (t) => {
   t.mock.method(console, 'error', () => {});
   const up = { name: 'X', base: 'http://x', key: 'k' };

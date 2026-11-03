@@ -421,16 +421,16 @@ h1 + .grid {
   border-radius: 50%;
   background: var(--muted);
 }
-.ok > .dot {
+.ok .dot {
   background: var(--ok);
 }
-.warn > .dot {
+.warn .dot {
   background: var(--warn);
 }
-.err > .dot {
+.err .dot {
   background: var(--err);
 }
-.run > .dot {
+.run .dot {
   background: var(--accent);
   animation: pulse 1s ease-in-out infinite;
 }
@@ -510,6 +510,110 @@ h1 + .grid {
 .dots i.on {
   background: var(--text);
   transform: scale(1.35);
+}
+
+/* Ekko: live map beside the message list */
+.ekko {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 1fr 270px;
+  gap: 12px;
+  margin-top: 10px;
+}
+@media (max-width: 640px) {
+  .ekko {
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr 1fr;
+  }
+}
+.map {
+  position: relative;
+  min-height: 0;
+}
+.map canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.turns {
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr); /* long text wraps or ellipsizes instead of widening the column */
+  align-content: start;
+  gap: 6px;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+.turn {
+  padding: 10px 12px;
+  font-size: 14px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  animation: arrive 0.25s ease-out;
+}
+.turn .said {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.turn .said b {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  font-weight: 560;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.turn time,
+.turn .path,
+.turn .ans {
+  font-size: 12px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.turn .path {
+  margin-top: 4px;
+  overflow-wrap: anywhere;
+}
+.turn.err .path {
+  color: var(--err);
+}
+.turn .ans {
+  display: -webkit-box;
+  margin-top: 4px;
+  overflow: hidden;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  user-select: text;
+}
+.run-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+  padding: 10px 10px 10px 16px;
+  background: var(--surface-2);
+  border: 1px solid var(--warn);
+  border-radius: 18px;
+}
+.run-card div {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  font-size: 14px;
+}
+.run-card b {
+  color: var(--warn);
+}
+.run-card .pill:not(.accent) {
+  background: var(--surface);
+  border: 1px solid var(--line);
+}
+.run-card .pill:disabled {
+  opacity: 0.5;
 }
 
 /* Toast */
