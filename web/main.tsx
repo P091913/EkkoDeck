@@ -416,6 +416,8 @@ function Ekko({ active }: { active: boolean }) {
     if (!active) return;
     let stopped = false;
     let timer: number | undefined;
+    // The first check after the page comes back on screen returns what happened while it was away: count it, don't play it.
+    let caughtUp = false;
     const tick = async (): Promise<void> => {
       const c = cursor.current;
       const r = await api(`/api/ekko/trace?after=${c.seq}`, undefined, 'GET');
@@ -436,12 +438,13 @@ function Ekko({ active }: { active: boolean }) {
         } else if (list.length) {
           list.forEach((e, i) => {
             m.add(e);
-            m.play(e, i * 180); // a batch plays in order rather than all at once
+            if (caughtUp) m.play(e, i * 180); // a batch plays in order rather than all at once
           });
           setEvents((old) => [...old, ...list].slice(-1000));
         }
         c.boot = r.data.boot;
         if (list.length) c.seq = list[list.length - 1].seq;
+        caughtUp = true;
       }
       timer = setTimeout(tick, 1000);
     };
