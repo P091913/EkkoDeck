@@ -61,6 +61,7 @@ function Tile({ b, round }: { b: Btn; round?: 'sm' | 'lg' }) {
   const notify = useContext(Notify);
   const [busy, setBusy] = useState(false);
   async function press() {
+    if (busy) return; // a second tap while the first is still running would send it twice
     setBusy(true);
     notify([`${b.label}…`, '']);
     notify(describe(await api(b.path), b.label));
@@ -173,13 +174,17 @@ function Tv() {
   const notify = useContext(Notify);
   const [title, setTitle] = useState('');
   const [candidates, setCandidates] = useState<Candidate[]>([]);
+  const [busy, setBusy] = useState(false);
 
   async function play(body: object) {
+    if (busy) return; // waking the TV takes minutes; a second Play would start another
+    setBusy(true);
     setCandidates([]);
     notify(['Working… waking the TV can take up to 2 minutes', '']);
     const r = await api('/api/tv/play', body);
     setCandidates(r.data.data?.candidates ?? []);
     notify(describe(r));
+    setBusy(false);
   }
 
   return (
@@ -193,7 +198,9 @@ function Tv() {
       >
         <Icon node={Search} size={24} />
         <input value={title} onInput={(e) => setTitle(e.currentTarget.value)} placeholder="Movie or show" />
-        <button class="pill accent">Play</button>
+        <button class="pill accent" disabled={busy}>
+          Play
+        </button>
       </form>
       {candidates.length > 0 && (
         <>
