@@ -472,7 +472,7 @@ function Ekko({ active }: { active: boolean }) {
       {waiting.map((r) => (
         <RunCard key={r.id} run={r} />
       ))}
-      <div class="ekko">
+      <div class="ekko-view">
         <div class="map" ref={box} aria-label="Live map of what Ekko is doing" role="img" />
         <div class="turns">
           {turns.length === 0 && <p class="empty">{down ? 'Ekko unavailable' : 'No messages yet.'}</p>}
