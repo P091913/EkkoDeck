@@ -317,6 +317,7 @@ h1 + .grid {
   overflow-y: auto;
 }
 .log p {
+  align-self: flex-start; /* hug the text; a flex column otherwise stretches Ekko's bubbles to the full 80% */
   max-width: 80%;
   margin: 0;
   padding: 10px 14px;
@@ -513,7 +514,7 @@ h1 + .grid {
 }
 
 /* Ekko: live map beside the message list */
-.ekko {
+.ekko-view {
   flex: 1;
   min-height: 0;
   display: grid;
@@ -522,7 +523,7 @@ h1 + .grid {
   margin-top: 10px;
 }
 @media (max-width: 640px) {
-  .ekko {
+  .ekko-view {
     grid-template-columns: 1fr;
     grid-template-rows: 1fr 1fr;
   }
