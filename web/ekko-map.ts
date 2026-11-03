@@ -76,7 +76,7 @@ export function createMap(box: HTMLElement): EkkoMap {
   const node = (key: string, kind: Kind, label: string): Node => ({ key, kind, label, x: 0, y: 0, r: 0, home: 0, count: 0, bad: 0, hit: 0 });
   const center = node('ekko', 'center', 'Ekko');
   const nodes = new Map<string, Node>();
-  const counted = new Map<Node, Set<string>>(); // request ids already counted for a swirl
+  const counted = new Map<Node, Map<string, boolean>>(); // request ids counted for a swirl -> whether that request failed there
   const toolDomain = new Map<string, string>(); // learned from the router, for older tool lines that name no domain
   let particles: Particle[] = [];
   const timers = new Set<ReturnType<typeof setTimeout>>();
@@ -209,9 +209,11 @@ export function createMap(box: HTMLElement): EkkoMap {
   function count(n: Node, e: TraceEvent) {
     if (new Date(e.ts).toDateString() !== new Date().toDateString()) return;
     let ids = counted.get(n);
-    if (!ids) counted.set(n, (ids = new Set()));
-    ids.add(e.requestId);
-    if (e.ok === false) n.bad++;
+    if (!ids) counted.set(n, (ids = new Map()));
+    // The request's last try decides, so a model or tool that fails once and then works on retry isn't a failure.
+    if (typeof e.ok === 'boolean' || !ids.has(e.requestId)) ids.set(e.requestId, e.ok === false);
+    const bad = [...ids.values()].filter(Boolean).length;
+    if (bad !== n.bad) (n.bad = bad), (wordsDirty = true);
     if (ids.size !== n.count) {
       n.count = ids.size;
       n.r = radiusOf(n);
