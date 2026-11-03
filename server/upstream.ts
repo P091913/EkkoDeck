@@ -42,7 +42,8 @@ async function request(up: Upstream, path: string, method: string, opts: Opts): 
       return { status: res.status, body: { ok: false, error: text.slice(0, 200) || `HTTP ${res.status}` } };
     }
   } catch (e) {
-    console.error(`${up.name} ${path}:`, e);
+    // Only button presses: the page's background checks (GETs) fail every second while a service is off, and show it on screen.
+    if (method !== 'GET') console.error(`${up.name} ${path}:`, e);
     const timedOut = (e as Error).name === 'TimeoutError';
     return { status: 502, body: { ok: false, error: `${up.name} ${timedOut ? 'timed out' : 'unavailable'}` } };
   }

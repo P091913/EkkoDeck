@@ -29,8 +29,8 @@ test('approving a Claude run only passes a well-formed run id through', async ()
   assert.equal((await decide('0123456789ab/delete')).status, 404);
 });
 
-test('upstream failures come back as JSON errors, with the key attached', async (t) => {
-  t.mock.method(console, 'error', () => {});
+test('upstream failures come back as JSON errors, with the key attached; only button presses are logged', async (t) => {
+  const log = t.mock.method(console, 'error', () => {});
   const up = { name: 'X', base: 'http://x', key: 'k' };
 
   assert.deepEqual(await call({ name: 'X' }, '/a'), { status: 503, body: { ok: false, error: 'X not configured' } });
@@ -46,6 +46,9 @@ test('upstream failures come back as JSON errors, with the key attached', async 
     throw new TypeError('fetch failed');
   });
   assert.deepEqual(await call(up, '/a'), { status: 502, body: { ok: false, error: 'X unavailable' } });
+  assert.equal(log.mock.callCount(), 0); // background checks fail every second while a service is off: not logged
+  await call(up, '/action/lock_pc', { method: 'POST' });
+  assert.equal(log.mock.callCount(), 1);
 
   fetchMock.mock.mockImplementation(async () => new Response('Bad Gateway', { status: 502 }));
   assert.deepEqual(await call(up, '/a'), { status: 502, body: { ok: false, error: 'Bad Gateway' } });
