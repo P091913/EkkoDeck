@@ -98,7 +98,8 @@ export function createMap(box: HTMLElement): EkkoMap {
     return n;
   }
 
-  const homeOf = (n: Node) => (n === center ? 40 : 7 + Math.min(14, Math.round(2 * Math.sqrt(n.count))));
+  // Kept few on purpose: the Pi draws every one, every frame.
+  const homeOf = (n: Node) => (n === center ? 6 : 1 + Math.min(2, Math.round(0.3 * Math.sqrt(n.count))));
   const radiusOf = (n: Node) => (n === center ? Math.min(W, H) * 0.12 : base * Math.min(2, 1 + 0.2 * Math.sqrt(n.count)));
 
   function particle(host: Node): Particle {
@@ -164,7 +165,7 @@ export function createMap(box: HTMLElement): EkkoMap {
   function send(from: Node, to: Node, n: number, ok: boolean) {
     if (from === to || !raf) return;
     const mine = particles.filter((p) => p.host === from && !p.fly);
-    n = Math.min(n, mine.length - (from === center ? 12 : 3));
+    n = Math.min(n, mine.length - (from === center ? 2 : 0));
     if (n <= 0) return;
     mine.sort((a, b) => Math.hypot(a.x - to.x, a.y - to.y) - Math.hypot(b.x - to.x, b.y - to.y));
     const now = performance.now();
@@ -224,13 +225,13 @@ export function createMap(box: HTMLElement): EkkoMap {
 
   function animate(e: TraceEvent, ch: Node, target?: Node) {
     const now = performance.now();
-    if (e.step === 'request') return send(ch, center, 6, true);
-    if (e.step === 'reply') return send(center, ch, 6, true);
-    if (e.step === 'route' && target) return send(center, target, 2, true);
+    if (e.step === 'request') return send(ch, center, 1, true);
+    if (e.step === 'reply') return send(center, ch, 1, true);
+    if (e.step === 'route' && target) return send(center, target, 1, true);
     if (target && e.step !== 'agent_run') {
       // Out to the model or tool and back; it already finished, so the way back shows how it went.
-      send(center, target, 4, true);
-      return later(650, () => send(target, center, 4, e.ok !== false));
+      send(center, target, 1, true);
+      return later(650, () => send(target, center, 1, e.ok !== false));
     }
     (target ?? center).hit = now; // the steps in between stir a swirl without moving anything
   }
@@ -242,7 +243,7 @@ export function createMap(box: HTMLElement): EkkoMap {
     lastTidy = now;
     for (const n of [center, ...nodes.values()]) {
       const mine = particles.filter((p) => p.host === n && !p.fly);
-      if (mine.length > n.home + 2) particles.splice(particles.indexOf(mine[0]), 1);
+      if (mine.length > n.home + 1) particles.splice(particles.indexOf(mine[0]), 1);
       else if (mine.length < n.home) particles.push(particle(n));
     }
   }
@@ -305,12 +306,13 @@ export function createMap(box: HTMLElement): EkkoMap {
     raf = requestAnimationFrame(frame);
     if (box.clientWidth !== W || box.clientHeight !== H) resize();
     if (!W || !H) return;
+    if (now - last < 30) return; // 30 fps: each frame costs the Pi CPU, and the swirls are slow enough not to need 60
     const dt = last ? Math.min(0.05, (now - last) / 1000) : 0;
     last = now;
     tidy(now);
     // The wash: the last frame fades toward transparent rather than vanishing, so particles trail and the page shows through.
     ctx.globalCompositeOperation = 'destination-out';
-    ctx.fillStyle = 'rgba(0,0,0,0.22)';
+    ctx.fillStyle = 'rgba(0,0,0,0.39)'; // at 30 fps, a trail fades out in about 0.2 s
     ctx.fillRect(0, 0, W, H);
     ctx.globalCompositeOperation = 'source-over';
     for (const p of particles) {
